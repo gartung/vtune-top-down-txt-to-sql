@@ -56,11 +56,12 @@ def extract_immediate_children(filename, parent_function):
         parent_function: The function name to find children for
     
     Returns:
-        List of tuples: (full_function_call, total_time)
+        Tuple[List[Tuple[str, str]], Optional[float]]: (children, parent_total_time)
     """
     children = []
     parent_indent = None
     found_parent = False
+    parent_total_time = None
     
     with open(filename, 'r', encoding='utf-8') as f:
         # Skip the header lines
@@ -91,6 +92,10 @@ def extract_immediate_children(filename, parent_function):
             if parent_function in function_stack and not found_parent:
                 parent_indent = indent
                 found_parent = True
+                try:
+                    parent_total_time = float(total_time)
+                except ValueError:
+                    parent_total_time = None
                 continue
             
             # If we found the parent, look for immediate children
@@ -102,7 +107,7 @@ def extract_immediate_children(filename, parent_function):
                 elif indent <= parent_indent:
                     break
     
-    return children
+    return children, parent_total_time
 
 
 def main():
@@ -119,26 +124,41 @@ def main():
     total_cpu_time = get_total_cpu_time(filename)
     print(f"Total CPU time: {total_cpu_time}\n")
     
-    children = extract_immediate_children(filename, parent_function)
+    children, parent_total_time = extract_immediate_children(filename, parent_function)
+    
+    if parent_total_time is not None:
+        parent_percentage = (parent_total_time / total_cpu_time * 100) if total_cpu_time > 0 else 0
+        print(f"{parent_function} total time: {parent_total_time:.6f} ({parent_percentage:.2f}% of total)\n")
+    else:
+        print(f"{parent_function} total time: N/A (function not found)\n")
     
     if not children:
         print("No children found.")
         return
     
     print(f"Found {len(children)} immediate children:\n")
-    print("-" * 120)
-    print(f"{'Function':<90} {'Total Time':>12} {'Percentage':>10}")
-    print("-" * 120)
+    print("-" * 150)
+    print(f"{'Function':<90} {'Total Time':>12} {'Pct of parent':>15} {'Pct of total':>15}")
+    print("-" * 150)
     
     for full_function, total_time in children:
         try:
             time_val = float(total_time)
-            percentage = (time_val / total_cpu_time * 100) if total_cpu_time > 0 else 0
-            print(f"{full_function:<90} {time_val:>12.6f} {percentage:>9.2f}%")
+            if parent_total_time and parent_total_time > 0:
+                pct_parent = time_val / parent_total_time * 100
+                pct_parent_str = f"{pct_parent:>9.2f}%"
+            else:
+                pct_parent_str = "N/A"
+            if total_cpu_time > 0:
+                pct_total = time_val / total_cpu_time * 100
+                pct_total_str = f"{pct_total:>9.2f}%"
+            else:
+                pct_total_str = "N/A"
+            print(f"{full_function:<90} {time_val:>12.6f} {pct_parent_str:>15} {pct_total_str:>15}")
         except ValueError:
-            print(f"{full_function:<90} {total_time:>12} {'N/A':>10}")
+            print(f"{full_function:<90} {total_time:>12} {'N/A':>15} {'N/A':>15}")
     
-    print("-" * 120)
+    print("-" * 150)
     print(f"\nTotal: {len(children)} functions")
 
 
