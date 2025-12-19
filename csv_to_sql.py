@@ -48,6 +48,7 @@ def parse_csv_to_database(csv_file, db_file):
             full_signature TEXT NOT NULL,
             total_time REAL NOT NULL,
             self_time REAL NOT NULL,
+            percentage REAL NOT NULL,
             indent_level INTEGER NOT NULL,
             line_number INTEGER NOT NULL
         )
@@ -74,6 +75,32 @@ def parse_csv_to_database(csv_file, db_file):
     cursor.execute('''
         CREATE INDEX IF NOT EXISTS idx_indent ON functions(indent_level)
     ''')
+    
+    cursor.execute('''
+        CREATE INDEX IF NOT EXISTS idx_percentage ON functions(percentage)
+    ''')
+    
+    # First pass: get total CPU time from first data line
+    total_cpu_time = 0.0
+    with open(csv_file, 'r', encoding='utf-8') as f:
+        # Skip header lines
+        for line in f:
+            if line.startswith('Function Stack;'):
+                break
+        
+        # Read first data line (Total)
+        for line in f:
+            if line.strip():
+                parts = line.split(';')
+                if len(parts) >= 2:
+                    try:
+                        total_cpu_time = float(parts[1])
+                    except ValueError:
+                        total_cpu_time = 1.0  # Avoid division by zero
+                break
+    
+    if total_cpu_time == 0.0:
+        total_cpu_time = 1.0  # Avoid division by zero
     
     # Parse CSV file
     parent_stack = []  # Stack to track parent functions at each level
@@ -124,12 +151,15 @@ def parse_csv_to_database(csv_file, db_file):
             # Generate unique ID
             func_id = generate_function_id(full_signature, line_number)
             
+            # Calculate percentage
+            percentage = (total_time / total_cpu_time * 100.0) if total_cpu_time > 0 else 0.0
+            
             # Insert function into database
             cursor.execute('''
                 INSERT OR REPLACE INTO functions 
-                (id, function_stack, short_name, full_signature, total_time, self_time, indent_level, line_number)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (func_id, function_stack, short_name, full_signature, total_time, self_time, indent_level, line_number))
+                (id, function_stack, short_name, full_signature, total_time, self_time, percentage, indent_level, line_number)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (func_id, function_stack, short_name, full_signature, total_time, self_time, percentage, indent_level, line_number))
             
             # Update parent stack
             # Remove parents at same or higher indent level
@@ -164,6 +194,7 @@ def parse_csv_to_database(csv_file, db_file):
     rel_count = cursor.fetchone()[0]
     
     print(f"Database created: {db_file}")
+    print(f"  Total CPU time: {total_cpu_time}")
     print(f"  Functions: {func_count}")
     print(f"  Relationships: {rel_count}")
     
