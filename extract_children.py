@@ -115,6 +115,10 @@ def main():
     
     print(f"Extracting immediate children of: {parent_function}\n")
     
+    # Get total CPU time
+    total_cpu_time = get_total_cpu_time(filename)
+    print(f"Total CPU time: {total_cpu_time}\n")
+    
     children = extract_immediate_children(filename, parent_function)
     
     if not children:
@@ -122,12 +126,19 @@ def main():
         return
     
     print(f"Found {len(children)} immediate children:\n")
-    print("-" * 100)
+    print("-" * 120)
+    print(f"{'Function':<90} {'Total Time':>12} {'Percentage':>10}")
+    print("-" * 120)
     
     for full_function, total_time in children:
-        print(f"{full_function}  {total_time}")
+        try:
+            time_val = float(total_time)
+            percentage = (time_val / total_cpu_time * 100) if total_cpu_time > 0 else 0
+            print(f"{full_function:<90} {time_val:>12.6f} {percentage:>9.2f}%")
+        except ValueError:
+            print(f"{full_function:<90} {total_time:>12} {'N/A':>10}")
     
-    print("-" * 100)
+    print("-" * 120)
     print(f"\nTotal: {len(children)} functions")
 
 
