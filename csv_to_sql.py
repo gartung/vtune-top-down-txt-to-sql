@@ -131,7 +131,7 @@ def parse_csv_to_database(csv_file, db_file):
             self_time_str = parts[2]
             full_signature = parts[3].strip()
             
-            # Extract short name from function stack
+            # Extract short name from function stack (trim all leading/trailing spaces)
             short_name = function_stack.strip()
             
             # Count indent level
