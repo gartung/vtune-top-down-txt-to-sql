@@ -71,11 +71,30 @@ def html_header(title):
             width: 100%;
             border-collapse: collapse;
             margin-top: 20px;
+            table-layout: fixed;
         }}
         th, td {{
             padding: 10px;
             text-align: left;
             border-bottom: 1px solid #ddd;
+        }}
+        th:nth-child(1), td:nth-child(1) {{
+            width: 15%;
+        }}
+        th:nth-child(2), td:nth-child(2) {{
+            width: 10%;
+        }}
+        th:nth-child(3), td:nth-child(3) {{
+            width: 10%;
+        }}
+        th:nth-child(4), td:nth-child(4) {{
+            width: 8%;
+        }}
+        th:nth-child(5), td:nth-child(5) {{
+            width: 7%;
+        }}
+        th:nth-child(6), td:nth-child(6) {{
+            width: auto;
         }}
         th {{
             background-color: #0078d4;
@@ -143,14 +162,16 @@ def html_header(title):
         }}
         .percentage-cell {{
             text-align: right;
-        }}        .signature-cell {
+        }}
+        .signature-cell {{
             font-family: 'Courier New', monospace;
             font-size: 12px;
             word-break: break-word;
             overflow-wrap: break-word;
             max-width: 0;
             white-space: normal;
-        }        .sort-controls {{
+        }}
+        .sort-controls {{
             margin: 20px 0;
             padding: 10px;
             background-color: #f0f0f0;

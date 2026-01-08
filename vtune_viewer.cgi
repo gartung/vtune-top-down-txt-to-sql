@@ -2,6 +2,13 @@
 """
 CGI script for viewing VTune top-down profiling data from SQLite database.
 Displays functions in a sortable table with drill-down capability.
+
+Usage:
+    Access via URL with database parameter:
+    http://server/vtune_viewer.cgi?db=/path/to/database.db
+    
+    Or with PATH_INFO:
+    http://server/vtune_viewer.cgi/path/to/database.db
 """
 
 import cgi
@@ -9,7 +16,7 @@ import cgitb
 import sqlite3
 import os
 import sys
-from urllib.parse import urlencode
+from urllib.parse import urlencode, unquote
 import html
 
 # Enable CGI error reporting
@@ -19,13 +26,23 @@ cgitb.enable()
 DEFAULT_DB = "step3-29834.21.top-down.db"
 
 def get_db_path():
-    """Get the database path from query string or use default."""
-    form = cgi.FieldStorage()
-    db_file = form.getfirst('db', DEFAULT_DB)
+    """Get the database path from PATH_INFO, query string, or use default."""
+    # Try to get from PATH_INFO first (e.g., /vtune_viewer.cgi/path/to/db.db)
+    path_info = os.environ.get('PATH_INFO', '').lstrip('/')
+    if path_info:
+        db_file = unquote(path_info)
+    else:
+        # Fall back to query parameter
+        form = cgi.FieldStorage()
+        db_file = form.getfirst('db', DEFAULT_DB)
     
-    # Security: ensure the db file is in the same directory as this script
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    db_path = os.path.join(script_dir, os.path.basename(db_file))
+    # If relative path, make it relative to script directory
+    if not os.path.isabs(db_file):
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        db_path = os.path.join(script_dir, db_file)
+    else:
+        # For absolute paths, use as-is
+        db_path = db_file
     
     if not os.path.exists(db_path):
         return None
@@ -80,11 +97,30 @@ def html_header(title):
             width: 100%;
             border-collapse: collapse;
             margin-top: 20px;
+            table-layout: fixed;
         }}
         th, td {{
             padding: 10px;
             text-align: left;
             border-bottom: 1px solid #ddd;
+        }}
+        th:nth-child(1), td:nth-child(1) {{
+            width: 15%;
+        }}
+        th:nth-child(2), td:nth-child(2) {{
+            width: 10%;
+        }}
+        th:nth-child(3), td:nth-child(3) {{
+            width: 10%;
+        }}
+        th:nth-child(4), td:nth-child(4) {{
+            width: 8%;
+        }}
+        th:nth-child(5), td:nth-child(5) {{
+            width: 7%;
+        }}
+        th:nth-child(6), td:nth-child(6) {{
+            width: auto;
         }}
         th {{
             background-color: #0078d4;
@@ -205,10 +241,9 @@ def html_footer():
 """
 
 
-def show_function_list(conn, sort_by='total'):
+def show_function_list(conn, db_path, sort_by='total'):
     """Display list of all functions with sorting."""
-    form = cgi.FieldStorage()
-    db_file = form.getfirst('db', DEFAULT_DB)
+    db_file = os.path.basename(db_path)
     
     # Determine sort order
     order_by = "total_time DESC"
@@ -225,7 +260,7 @@ def show_function_list(conn, sort_by='total'):
     cursor.execute(f'''
         SELECT id, short_name, full_signature, total_time, self_time, percentage, indent_level
         FROM functions
-        ORDER BY {order_by}
+        ORDER BY {order_by} 
     ''')
     
     functions = cursor.fetchall()
@@ -286,10 +321,9 @@ def show_function_list(conn, sort_by='total'):
     print(html_footer())
 
 
-def show_function_details(conn, func_id, sort_by='total'):
+def show_function_details(conn, func_id, db_path, sort_by='total'):
     """Display function details and its immediate children."""
-    form = cgi.FieldStorage()
-    db_file = form.getfirst('db', DEFAULT_DB)
+    db_file = os.path.basename(db_path)
     
     cursor = conn.cursor()
     
@@ -404,9 +438,9 @@ def main():
         
         # Route to appropriate view
         if view == 'function' and func_id:
-            show_function_details(conn, func_id, sort_by)
+            show_function_details(conn, func_id, db_path, sort_by)
         else:
-            show_function_list(conn, sort_by)
+            show_function_list(conn, db_path, sort_by)
         
         conn.close()
         

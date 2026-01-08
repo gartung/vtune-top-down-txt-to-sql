@@ -222,7 +222,7 @@ def parse_csv_to_database(csv_file, db_file):
     
     # Populate function_children_cache
     cursor.execute('''
-        INSERT OR IGNORE INTO function_children_cache 
+        INSERT INTO function_children_cache 
         (parent_id, child_id, child_short_name, child_full_signature, 
          child_total_time, child_self_time, child_percentage, child_indent_level)
         SELECT 
