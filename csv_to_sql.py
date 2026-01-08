@@ -80,6 +80,37 @@ def parse_csv_to_database(csv_file, db_file):
         CREATE INDEX IF NOT EXISTS idx_percentage ON functions(percentage)
     ''')
     
+    cursor.execute('''
+        CREATE INDEX IF NOT EXISTS idx_total_time ON functions(total_time)
+    ''')
+    
+    cursor.execute('''
+        CREATE INDEX IF NOT EXISTS idx_self_time ON functions(self_time)
+    ''')
+    
+    cursor.execute('''
+        CREATE INDEX IF NOT EXISTS idx_short_name ON functions(short_name)
+    ''')
+    
+    # Cache table for function children (denormalized for faster lookups)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS function_children_cache (
+            parent_id TEXT NOT NULL,
+            child_id TEXT NOT NULL,
+            child_short_name TEXT NOT NULL,
+            child_full_signature TEXT NOT NULL,
+            child_total_time REAL NOT NULL,
+            child_self_time REAL NOT NULL,
+            child_percentage REAL NOT NULL,
+            child_indent_level INTEGER NOT NULL,
+            PRIMARY KEY (parent_id, child_id)
+        )
+    ''')
+    
+    cursor.execute('''
+        CREATE INDEX IF NOT EXISTS idx_fcc_parent ON function_children_cache(parent_id)
+    ''')
+    
     # First pass: get total CPU time from first data line
     total_cpu_time = 0.0
     with open(csv_file, 'r', encoding='utf-8') as f:
@@ -186,6 +217,31 @@ def parse_csv_to_database(csv_file, db_file):
     # Commit and close
     conn.commit()
     
+    # Build cache tables
+    print("Building cache tables...")
+    
+    # Populate function_children_cache
+    cursor.execute('''
+        INSERT OR IGNORE INTO function_children_cache 
+        (parent_id, child_id, child_short_name, child_full_signature, 
+         child_total_time, child_self_time, child_percentage, child_indent_level)
+        SELECT 
+            cr.parent_id,
+            f.id,
+            f.short_name,
+            f.full_signature,
+            f.total_time,
+            f.self_time,
+            f.percentage,
+            f.indent_level
+        FROM functions f
+        JOIN call_relationships cr ON f.id = cr.child_id
+        WHERE cr.parent_id IS NOT NULL
+        ORDER BY cr.parent_id, f.total_time DESC
+    ''')
+    
+    conn.commit()
+    
     # Print statistics
     cursor.execute('SELECT COUNT(*) FROM functions')
     func_count = cursor.fetchone()[0]
@@ -193,10 +249,14 @@ def parse_csv_to_database(csv_file, db_file):
     cursor.execute('SELECT COUNT(*) FROM call_relationships')
     rel_count = cursor.fetchone()[0]
     
+    cursor.execute('SELECT COUNT(*) FROM function_children_cache')
+    cache_count = cursor.fetchone()[0]
+    
     print(f"Database created: {db_file}")
     print(f"  Total CPU time: {total_cpu_time}")
     print(f"  Functions: {func_count}")
     print(f"  Relationships: {rel_count}")
+    print(f"  Cached children: {cache_count}")
     
     conn.close()
 
